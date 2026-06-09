@@ -6,6 +6,7 @@ import Chat from "./components/Chat";
 import Quiz from "./components/Quiz";
 import Summarize from "./components/Summarize";
 import { useAppState } from "./hooks/useAppState";
+import VideoPage from "./components/Video";
 
 export default function App() {
   const [showApp, setShowApp] = useState(false);
@@ -21,14 +22,24 @@ export default function App() {
     handleUpload,
   } = useAppState();
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "chat":      return <Chat isReady={isReady} />;
-      case "quiz":      return <Quiz isReady={isReady} />;
-      case "summarize": return <Summarize isReady={isReady} />;
-      default:          return <Chat isReady={isReady} />;
-    }
-  };
+const renderContent = () => {
+  switch (activeTab) {
+    case "chat":
+      return <Chat isReady={isReady} />;
+
+    case "quiz":
+      return <Quiz isReady={isReady} />;
+
+    case "summarize":
+      return <Summarize isReady={isReady} />;
+
+    case "video":
+      return <VideoPage isReady={isReady} />;
+
+    default:
+      return <Chat isReady={isReady} />;
+  }
+};
 
   // Show landing page until user clicks Get Started
   if (!showApp) {

@@ -204,7 +204,7 @@ export default function Summarize({ isReady }) {
           <button
             onClick={handleGenerate}
             disabled={!isReady || !topic.trim() || loading}
-            className="btn-teal w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-white font-body font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+            className="btn-teal w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-black font-body font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
           >
             {loading ? (
               <>

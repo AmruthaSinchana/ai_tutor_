@@ -1,5 +1,5 @@
 // src/components/Quiz.jsx
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback,useEffect } from "react";
 import {
   Brain,
   ChevronRight,
@@ -32,12 +32,16 @@ function MCQQuestion({ question, index, answer, onAnswer, revealed }) {
             else if (opt === answer && opt !== question.answer) cls += " wrong";
           } else if (opt === answer) {
             cls += " selected";
+            cls += " border-4 border-yellow-500 bg-green-100";
           }
           return (
             <div
               key={i}
-              className={cls}
-              onClick={() => !revealed && onAnswer(opt)}
+              className={cls} 
+              onClick={() => {
+                console.log("MCQ Click", opt);
+                console.log("onAnswer =", onAnswer);
+                !revealed && onAnswer(opt)}}
             >
               <div className="flex items-center gap-3">
                 {revealed && opt === question.answer && (
@@ -162,6 +166,10 @@ export default function Quiz({ isReady }) {
   const [error, setError] = useState(null);
   const [phase, setPhase] = useState("config"); // config | quiz | score
 
+  useEffect(() => {
+  console.log("answers =", answers);
+}, [answers]);
+
   const handleGenerate = useCallback(async () => {
     if (!topic.trim()) return;
     setLoading(true);
@@ -181,7 +189,11 @@ export default function Quiz({ isReady }) {
     }
   }, [topic, quizType, numQ]);
 
-  const handleAnswer = (val) => setAnswers((prev) => ({ ...prev, [currentIdx]: val }));
+  const handleAnswer = (val) => {console.log("Clicked:", val)
+    setAnswers((prev) => ({ 
+      ...prev, 
+      [currentIdx]: val 
+    }))};
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -293,7 +305,7 @@ export default function Quiz({ isReady }) {
             <button
               onClick={handleGenerate}
               disabled={!isReady || !topic.trim() || loading}
-              className="btn-teal w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-white font-body font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+              className="btn-teal w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-black font-body font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
             >
               {loading ? (
                 <>
@@ -377,7 +389,7 @@ export default function Quiz({ isReady }) {
               {currentIdx < questions.length - 1 ? (
                 <button
                   onClick={() => { setCurrentIdx((i) => i + 1); setRevealed(false); }}
-                  className="btn-teal flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-sm font-body ml-auto"
+                  className="btn-teal flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-black text-sm font-body ml-auto"
                 >
                   Next <ChevronRight size={15} />
                 </button>
@@ -385,7 +397,7 @@ export default function Quiz({ isReady }) {
                 <button
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="btn-coral flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-white text-sm font-body font-semibold ml-auto disabled:opacity-40"
+                  className="btn-coral flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-black text-sm font-body font-semibold ml-auto disabled:opacity-40"
                 >
                   {loading ? <Loader2 size={15} className="animate-spin" /> : <Trophy size={15} />}
                   Submit Quiz

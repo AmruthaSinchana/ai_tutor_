@@ -10,12 +10,14 @@ import {
   Loader2,
   AlertCircle,
   X,
+  Video,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { id: "chat", label: "Ask AI", icon: MessageSquare, desc: "Q&A from your PDFs" },
   { id: "quiz", label: "Quiz Me", icon: Brain, desc: "Test your knowledge" },
   { id: "summarize", label: "Summarize", icon: FileText, desc: "Summaries & notes" },
+  { id: "video", label: "Videos", icon: Video, desc: "Related Videos" },
 ];
 
 export default function Sidebar({

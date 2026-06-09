@@ -120,3 +120,21 @@ export async function summarize(topic, summary_type) {
   }
   return res.json();
 }
+// Video generator
+export async function getVideos(topic) {
+  const response = await fetch("http://localhost:8000/videos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      topic,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch videos");
+  }
+
+  return response.json();
+}

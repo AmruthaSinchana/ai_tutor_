@@ -250,3 +250,16 @@ async def summarize(request: SummarizeRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+#video
+from rag.video_recommender import search_youtube_videos
+
+@app.post("/videos")
+async def videos(request: dict):
+    topic = request.get("topic")
+
+    videos = search_youtube_videos(topic)
+
+    return {
+        "videos": videos
+    }
