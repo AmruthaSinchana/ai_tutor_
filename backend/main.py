@@ -7,13 +7,14 @@ Run with: uvicorn main:app --reload --port 8000
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
 import asyncio
 import json
 import os
+import shutil
 import numpy as np
 
 load_dotenv()
@@ -35,9 +36,13 @@ from auth import (
     create_session,
     validate_token,
     revoke_token,
+    save_pdf_record,
+    get_user_pdfs,
+    delete_pdf_record,
 )
 
-# ── App ───────────────────────────────────────────────────────────────────────
+UPLOAD_DIR = "uploaded_pdfs"
+
 app = FastAPI(title="AI Tutor API")
 
 app.add_middleware(
@@ -51,6 +56,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     print("[startup] SQLite auth DB ready.")
 
 # ── In-memory state ───────────────────────────────────────────────────────────
@@ -88,7 +94,10 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+class DeletePdfRequest(BaseModel):
+    pdf_id: int
+    username: str
+
 def check_ready():
     if state["retriever"] is None:
         raise HTTPException(
@@ -102,7 +111,6 @@ def check_ready():
 
 @app.post("/register")
 def register(req: RegisterRequest):
-    """Register a new student from the UI."""
     if not req.username.strip() or not req.password.strip():
         raise HTTPException(400, "Username and password are required.")
     ok = create_user(req.username.strip(), req.password)
@@ -112,29 +120,33 @@ def register(req: RegisterRequest):
 
 @app.post("/login")
 def login(req: LoginRequest):
-    """Login and return a session token."""
     user = get_user(req.username)
     if not user or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(401, "Invalid username or password.")
     token = create_session(req.username)
-    # FIX: added role field so frontend doesn't get undefined
-    return {"success": True, "username": req.username, "token": token, "role": "student"}
+    # fetch their previously uploaded PDFs
+    pdfs = get_user_pdfs(req.username)
+    return {
+        "success":  True,
+        "username": req.username,
+        "token":    token,
+        "role":     "student",
+        # "pdfs":     pdfs   # ← list of {id, filename, filepath, uploaded_at}
+         "pdfs": []         
+    }
 
 @app.post("/logout")
 def logout(authorization: Optional[str] = Header(None)):
-    """Revoke session token."""
     if authorization and authorization.startswith("Bearer "):
         revoke_token(authorization[7:])
     return {"success": True}
 
 @app.get("/users")
 def get_users():
-    """List all registered students."""
     return {"users": list_users()}
 
 @app.delete("/users/{username}")
 def remove_user(username: str):
-    """Delete a student account."""
     delete_user(username)
     return {"success": True}
 
@@ -160,20 +172,40 @@ def get_status():
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 @app.post("/upload")
-async def upload_pdf(files: List[UploadFile] = File(...)):
+async def upload_pdf(
+    files: List[UploadFile] = File(...),
+    authorization: Optional[str] = Header(None)
+):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
-    all_chunks    = []
+    # get username from token (optional — still works if not logged in)
+    username = None
+    if authorization and authorization.startswith("Bearer "):
+        username = validate_token(authorization[7:])
+
+    all_chunks     = []
     uploaded_names = []
 
     for file in files:
         if not file.filename.endswith(".pdf"):
             raise HTTPException(status_code=400, detail=f"{file.filename} is not a PDF")
         try:
+            # save file to disk
+            filepath = os.path.join(UPLOAD_DIR, file.filename)
+            with open(filepath, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+
+            # reset file pointer for RAG processing
+            file.file.seek(0)
             chunks = load_multiple_pdfs([file])
             all_chunks.extend(chunks)
             uploaded_names.append(file.filename)
+
+            # save record to DB if user is logged in
+            if username:
+                save_pdf_record(username, file.filename, filepath)
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error processing {file.filename}: {str(e)}")
 
@@ -198,10 +230,33 @@ async def upload_pdf(files: List[UploadFile] = File(...)):
         "chunks":  len(all_chunks)
     }
 
+# ── Get user's PDFs ───────────────────────────────────────────────────────────
+@app.get("/my-pdfs")
+def my_pdfs(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Not authenticated.")
+    username = validate_token(authorization[7:])
+    if not username:
+        raise HTTPException(401, "Invalid or expired token.")
+    pdfs = get_user_pdfs(username)
+    return {"pdfs": pdfs}
+
+# ── Delete a PDF ──────────────────────────────────────────────────────────────
+@app.delete("/pdfs/{pdf_id}")
+def delete_pdf(pdf_id: int, authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Not authenticated.")
+    username = validate_token(authorization[7:])
+    if not username:
+        raise HTTPException(401, "Invalid or expired token.")
+    deleted = delete_pdf_record(pdf_id, username)
+    if not deleted:
+        raise HTTPException(404, "PDF not found.")
+    return {"success": True}
+
 # ── Chunks ────────────────────────────────────────────────────────────────────
 @app.get("/chunks")
 def get_chunks():
-    """Export all indexed chunks with text, metadata and embedding vectors."""
     if state["vectorstore"] is None:
         raise HTTPException(400, "No PDF processed yet.")
     try:
@@ -238,7 +293,6 @@ async def chat_stream(request: QuestionRequest):
     async def generate():
         try:
             rag_chain, retriever = state["qa_chain"]
-
             sources = retriever.invoke(request.question)
             formatted_sources = [
                 {
@@ -248,7 +302,6 @@ async def chat_stream(request: QuestionRequest):
                 }
                 for src in sources
             ]
-
             yield f"data: {json.dumps({'type': 'sources', 'data': formatted_sources})}\n\n"
 
             full_answer = ""
@@ -264,7 +317,6 @@ async def chat_stream(request: QuestionRequest):
                 "answer":   full_answer,
                 "sources":  formatted_sources
             })
-
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'data': str(e)})}\n\n"
 
@@ -279,11 +331,22 @@ async def chat_stream(request: QuestionRequest):
 def get_history():
     return {"history": state["chat_history"]}
 
-@app.delete("/chat/history")
-def clear_history():
-    state["chat_history"] = []
-    return {"success": True}
+# @app.delete("/chat/history")
+# def clear_history():
+#     state["chat_history"] = []
+#     return {"success": True}
 
+
+@app.delete("/pdfs-by-name/{filename}")
+def delete_pdf_by_name(filename: str):
+
+    if filename in state["uploaded_pdfs"]:
+        state["uploaded_pdfs"].remove(filename)
+
+    return {
+        "success": True,
+        "pdfs": state["uploaded_pdfs"]
+    }
 # ── Quiz ──────────────────────────────────────────────────────────────────────
 @app.post("/quiz/generate")
 async def generate_quiz(request: QuizRequest):
@@ -300,13 +363,7 @@ async def generate_quiz(request: QuizRequest):
             questions = generate_fill_in_the_blank(retriever, request.topic, request.num_questions)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown quiz type: {request.quiz_type}")
-
-        return {
-            "success":   True,
-            "quiz_type": request.quiz_type,
-            "topic":     request.topic,
-            "questions": questions
-        }
+        return {"success": True, "quiz_type": request.quiz_type, "topic": request.topic, "questions": questions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -335,13 +392,7 @@ async def summarize(request: SummarizeRequest):
             output = generate_key_terms(retriever, request.topic)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown summary type: {request.summary_type}")
-
-        return {
-            "success":      True,
-            "topic":        request.topic,
-            "summary_type": request.summary_type,
-            "content":      output
-        }
+        return {"success": True, "topic": request.topic, "summary_type": request.summary_type, "content": output}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

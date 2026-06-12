@@ -41,6 +41,7 @@ export default function App() {
     localStorage.removeItem("ai_tutor_session");
     setUser(null);
     setScreen("landing");
+    indow.location.reload();
   };
 
   const handleEnterApp = () => setScreen("app");

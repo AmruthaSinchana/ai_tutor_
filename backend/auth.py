@@ -1,11 +1,12 @@
 """
-auth.py — SQLite login, register via UI
+auth.py — SQLite login, register, PDF storage
 pip install passlib[bcrypt]
 """
-import sqlite3, secrets
+import sqlite3, secrets, os, shutil
 from passlib.context import CryptContext
 
 DB_PATH = "users.db"
+UPLOAD_DIR = "uploaded_pdfs"
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_db():
@@ -14,6 +15,7 @@ def get_db():
     return conn
 
 def init_db():
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     conn = get_db()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS users (
@@ -24,6 +26,14 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sessions (
             token    TEXT PRIMARY KEY,
             username TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS pdfs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            username    TEXT NOT NULL,
+            filename    TEXT NOT NULL,
+            filepath    TEXT NOT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (username) REFERENCES users(username)
         );
     """)
     conn.commit()
@@ -37,7 +47,7 @@ def create_user(username, password):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        return False   # username taken
+        return False
     finally:
         conn.close()
 
@@ -90,3 +100,35 @@ def revoke_token(token):
     conn.execute("DELETE FROM sessions WHERE token=?", (token,))
     conn.commit()
     conn.close()
+
+# ── PDF functions ─────────────────────────────────────────────────────────────
+
+def save_pdf_record(username, filename, filepath):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO pdfs (username, filename, filepath) VALUES (?,?,?)",
+        (username, filename, filepath)
+    )
+    conn.commit()
+    conn.close()
+
+def get_user_pdfs(username):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, filename, filepath, uploaded_at FROM pdfs WHERE username=? ORDER BY uploaded_at DESC",
+        (username,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def delete_pdf_record(pdf_id, username):
+    conn = get_db()
+    row = conn.execute("SELECT filepath FROM pdfs WHERE id=? AND username=?", (pdf_id, username)).fetchone()
+    if row:
+        filepath = row["filepath"]
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        conn.execute("DELETE FROM pdfs WHERE id=?", (pdf_id,))
+        conn.commit()
+    conn.close()
+    return row is not None

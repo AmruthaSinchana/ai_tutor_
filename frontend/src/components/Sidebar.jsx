@@ -14,15 +14,16 @@ import {
   LogOut,
   User,
   Download,
-  LayoutDashboard,  // ← NEW
+  LayoutDashboard,
+  X,// ← NEW
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { id: "chat",      label: "Ask AI",      icon: MessageSquare,   desc: "Q&A from your PDFs"    },
-  { id: "quiz",      label: "Quiz Me",     icon: Brain,           desc: "Test your knowledge"   },
-  { id: "summarize", label: "Summarize",   icon: FileText,        desc: "Summaries & notes"     },
-  { id: "video",     label: "Videos",      icon: Video,           desc: "Related Videos"        },
-  { id: "dashboard", label: "Dashboard",   icon: LayoutDashboard, desc: "Progress & weak topics" }, // ← NEW
+  { id: "chat", label: "Ask AI", icon: MessageSquare, desc: "Q&A from your PDFs" },
+  { id: "quiz", label: "Quiz Me", icon: Brain, desc: "Test your knowledge" },
+  { id: "summarize", label: "Summarize", icon: FileText, desc: "Summaries & notes" },
+  { id: "video", label: "Videos", icon: Video, desc: "Related Videos" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, desc: "Progress & weak topics" }, // ← NEW
 ];
 
 export default function Sidebar({
@@ -69,6 +70,23 @@ export default function Sidebar({
       alert("Could not download chunks: " + err.message);
     }
   };
+ const removePdf = async (filename) => {
+  try {
+    const res = await fetch(
+      `http://localhost:8000/pdfs-by-name/${encodeURIComponent(filename)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!res.ok) throw new Error("Delete failed");
+
+    window.location.reload();
+  } catch (err) {
+    console.error(err);
+    alert("Failed to delete PDF");
+  }
+};
 
   return (
     <aside
@@ -111,11 +129,10 @@ export default function Sidebar({
             <li key={id}>
               <button
                 onClick={() => setActiveTab(id)}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left group transition-all ${
-                  activeTab === id
-                    ? "bg-violet-600/30 border border-violet-500/40"
-                    : "hover:bg-white/5 border border-transparent"
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left group transition-all ${activeTab === id
+                  ? "bg-violet-600/30 border border-violet-500/40"
+                  : "hover:bg-white/5 border border-transparent"
+                  }`}
               >
                 <Icon
                   size={18}
@@ -142,9 +159,35 @@ export default function Sidebar({
         {uploadedFiles.length > 0 && (
           <div className="space-y-1 mb-1">
             {uploadedFiles.map((f, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-                <CheckCircle size={13} className="text-violet-400 flex-shrink-0" />
-                <span className="text-xs text-indigo-200 truncate font-body">{f}</span>
+              <div
+                key={i}
+                className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <CheckCircle
+                    size={13}
+                    className="text-violet-400 flex-shrink-0"
+                  />
+
+                  <span className="text-xs text-indigo-200 truncate font-body">
+                    {typeof f === "string" ? f : f.filename}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log(f);
+                  }}
+                  className="text-red-400 hover:text-red-300 ml-2"
+                >
+                  <X size={14} />
+                </button>
+
+
               </div>
             ))}
           </div>

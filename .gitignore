@@ -4,3 +4,33 @@ venv/
 __pycache__/
 .env
 node_modules/
+# Python
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+backend/.env
+
+# Database
+*.db
+users.db
+backend/users.db
+
+# Uploaded PDFs
+uploaded_pdfs/
+backend/uploaded_pdfs/
+
+# React
+frontend/node_modules/
+node_modules/
+
+# Build files
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db

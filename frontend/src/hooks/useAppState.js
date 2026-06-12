@@ -15,7 +15,8 @@ export function useAppState() {
     getStatus()
       .then((data) => {
         setIsReady(data.ready);
-        setUploadedFiles(data.pdfs || []);
+        // setUploadedFiles(data.pdfs || []);
+        setUploadedFiles([]);
       })
       .catch(() => {}); // backend may not be running yet
   }, []);
