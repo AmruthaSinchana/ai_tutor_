@@ -31,6 +31,7 @@ export default function Sidebar({
   setActiveTab,
   isReady,
   uploadedFiles,
+  setUploadedFiles,
   isUploading,
   uploadError,
   uploadSuccess,
@@ -70,8 +71,10 @@ export default function Sidebar({
       alert("Could not download chunks: " + err.message);
     }
   };
- const removePdf = async (filename) => {
+  const removePdf = async (filename) => {
   try {
+    console.log("Deleting:", filename);
+
     const res = await fetch(
       `http://localhost:8000/pdfs-by-name/${encodeURIComponent(filename)}`,
       {
@@ -79,15 +82,26 @@ export default function Sidebar({
       }
     );
 
-    if (!res.ok) throw new Error("Delete failed");
+    console.log("Status:", res.status);
 
-    window.location.reload();
+    const text = await res.text();
+    console.log("Response:", text);
+
+    if (!res.ok) {
+      throw new Error(`Delete failed: ${res.status}`);
+    }
+
+    setUploadedFiles((prev) =>
+      prev.filter(
+        (file) =>
+          (typeof file === "string" ? file : file.filename) !== filename
+      )
+    );
   } catch (err) {
     console.error(err);
-    alert("Failed to delete PDF");
+    alert(err.message);
   }
 };
-
   return (
     <aside
       className="w-64 flex-shrink-0 flex flex-col h-screen sticky top-0 overflow-y-auto"
@@ -180,6 +194,7 @@ export default function Sidebar({
                     e.preventDefault();
                     e.stopPropagation();
 
+                    removePdf(typeof f === "string" ? f : f.filename);
                     console.log(f);
                   }}
                   className="text-red-400 hover:text-red-300 ml-2"

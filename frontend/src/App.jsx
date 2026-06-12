@@ -48,7 +48,7 @@ export default function App() {
 
   const {
     activeTab, setActiveTab,
-    isReady, uploadedFiles,
+    isReady, uploadedFiles,setUploadedFiles,
     isUploading, uploadError, uploadSuccess,
     handleUpload,
   } = useAppState();
@@ -57,6 +57,7 @@ export default function App() {
   //    we store the topic + destination here, then navigate to that tab.
   const [prefillTopic,  setPrefillTopic]  = useState("");
   const [prefillTarget, setPrefillTarget] = useState(""); // "quiz" | "summarize" | "video"
+  
 
   const navigateWithTopic = (tab, topic) => {
     setPrefillTopic(topic);
@@ -91,7 +92,7 @@ export default function App() {
       onLoginClick={() => setScreen("login")}
     />
   );
-
+  //const [uploadedFiles, setUploadedFiles] = useState([]);
   // ── Main app shell ────────────────────────────────────────────────────────────
   return (
     <div className="aurora-bg min-h-screen flex">
@@ -100,6 +101,7 @@ export default function App() {
         isReady={isReady}           uploadedFiles={uploadedFiles}
         isUploading={isUploading}   uploadError={uploadError}
         uploadSuccess={uploadSuccess} handleUpload={handleUpload}
+        setUploadedFiles={setUploadedFiles}
         onBack={() => setScreen("landing")}
         onLogout={handleLogout}
         user={user}

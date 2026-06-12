@@ -42,6 +42,7 @@ export function useAppState() {
     setActiveTab,
     isReady,
     uploadedFiles,
+    setUploadedFiles,
     isUploading,
     uploadError,
     uploadSuccess,
